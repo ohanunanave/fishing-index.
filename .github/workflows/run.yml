@@ -1,12 +1,20 @@
 name: fishing-index
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore: ["results/**"]
   schedule:
-    - cron: "17 2 * * *"   # every day ~04:17 Israel time
+    - cron: "17 */3 * * *"   # every 3 hours
 permissions:
   contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: fishing-index
+  cancel-in-progress: false
 jobs:
-  run:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,11 +22,12 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install requests pandas numpy
-      - name: Run index (live data)
+      - name: Run index (live data) and build page
         run: |
-          mkdir -p results
+          mkdir -p results site
           python fishing_index.py --days 7 --csv results/fishing_index.csv --html results/fishing_index.html --md results/summary.md
-          python build_page.py results/fishing_index.csv results/index.html
+          python build_page.py results/fishing_index.csv site/index.html
+          cp site/index.html results/index.html
           cat results/summary.md >> "$GITHUB_STEP_SUMMARY"
       - name: Commit results
         run: |
@@ -26,4 +35,17 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
           git add results
           git commit -m "Update fishing index results" || echo "no changes"
-          git push
+          git pull --rebase -q || true
+          git push || echo "push skipped"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
