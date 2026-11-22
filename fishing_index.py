@@ -158,6 +158,25 @@ MARINE_VARS = ["wave_height", "wave_period", "wave_direction", "sea_surface_temp
                "sea_level_height_msl", "ocean_current_velocity"]
 
 
+def _get_json(url: str, params: dict, tries: int = 6) -> dict:
+    """GET with retry/backoff – Open-Meteo returns 429 when shared CI IPs are busy."""
+    import time
+    import requests
+
+    wait = 10
+    for attempt in range(tries):
+        r = requests.get(url, params=params, timeout=30)
+        if r.status_code not in (429, 500, 502, 503, 504):
+            r.raise_for_status()
+            return r.json()
+        if attempt == tries - 1:
+            r.raise_for_status()
+        ra = r.headers.get("Retry-After")
+        time.sleep(int(ra) if ra and ra.isdigit() else wait)
+        wait = min(wait * 2, 120)
+    raise RuntimeError("unreachable")
+
+
 def fetch_open_meteo(lat: float, lon: float, days: int, past_days: int = 3,
                      start_date: str | None = None, end_date: str | None = None) -> pd.DataFrame:
     import requests
@@ -169,13 +188,10 @@ def fetch_open_meteo(lat: float, lon: float, days: int, past_days: int = 3,
     else:
         common.update(forecast_days=days, past_days=past_days)
         wurl = "https://api.open-meteo.com/v1/forecast"
-    w = requests.get(wurl, params={**common, "hourly": ",".join(WEATHER_VARS)}, timeout=30)
-    w.raise_for_status()
-    m = requests.get("https://marine-api.open-meteo.com/v1/marine",
-                     params={**common, "hourly": ",".join(MARINE_VARS)}, timeout=30)
-    m.raise_for_status()
-    dw = pd.DataFrame(w.json()["hourly"])
-    dm = pd.DataFrame(m.json()["hourly"])
+    w = _get_json(wurl, {**common, "hourly": ",".join(WEATHER_VARS)})
+    m = _get_json("https://marine-api.open-meteo.com/v1/marine", {**common, "hourly": ",".join(MARINE_VARS)})
+    dw = pd.DataFrame(w["hourly"])
+    dm = pd.DataFrame(m["hourly"])
     df = dw.merge(dm, on="time", how="outer")
     df["time"] = pd.to_datetime(df["time"]).dt.tz_localize(TZ, ambiguous="NaT", nonexistent="shift_forward")
     return df.dropna(subset=["time"]).set_index("time").sort_index()
@@ -366,7 +382,13 @@ def run(beaches, species_keys, days, demo=False) -> pd.DataFrame:
     now = pd.Timestamp.now(tz=TZ).floor("h")
     for bkey in beaches:
         b = BEACHES[bkey]
-        raw = demo_data(days) if demo else fetch_open_meteo(b["lat"], b["lon"], days)
+        if demo:
+            raw = demo_data(days)
+        else:
+            if rows:
+                import time
+                time.sleep(3)  # be gentle with the free API
+            raw = fetch_open_meteo(b["lat"], b["lon"], days)
         feat = add_features(raw, b)
         feat = feat[feat.index >= now]
         for skey in species_keys:
