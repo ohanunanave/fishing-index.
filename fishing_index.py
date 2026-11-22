@@ -165,7 +165,14 @@ def _get_json(url: str, params: dict, tries: int = 6) -> dict:
 
     wait = 10
     for attempt in range(tries):
-        r = requests.get(url, params=params, timeout=30)
+        try:
+            r = requests.get(url, params=params, timeout=60)
+        except (requests.ConnectionError, requests.Timeout):
+            if attempt == tries - 1:
+                raise
+            time.sleep(wait)
+            wait = min(wait * 2, 120)
+            continue
         if r.status_code not in (429, 500, 502, 503, 504):
             r.raise_for_status()
             return r.json()
