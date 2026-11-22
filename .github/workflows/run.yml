@@ -1,0 +1,28 @@
+name: fishing-index
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 2 * * *"   # every day ~04:17 Israel time
+permissions:
+  contents: write
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests pandas numpy
+      - name: Run index (live data)
+        run: |
+          mkdir -p results
+          python fishing_index.py --days 7 --csv results/fishing_index.csv --html results/fishing_index.html --md results/summary.md
+          cat results/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Commit results
+        run: |
+          git config user.name "fishing-index-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add results
+          git commit -m "Update fishing index results" || echo "no changes"
+          git push
