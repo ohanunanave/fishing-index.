@@ -18,6 +18,7 @@ jobs:
         run: |
           mkdir -p results
           python fishing_index.py --days 7 --csv results/fishing_index.csv --html results/fishing_index.html --md results/summary.md
+          python build_page.py results/fishing_index.csv results/index.html
           cat results/summary.md >> "$GITHUB_STEP_SUMMARY"
       - name: Commit results
         run: |

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>מדד דיג חוף דרום</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Secular+One&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* layout: one column for the phone – summary (best windows) first, then week grid, then hour detail */
+:root{
+  --bg:#f3f6f6; --surface:#ffffff; --ink:#12302f; --muted:#5d7472; --line:#d6e0df; --accent:#0b7a75;
+  --good:#1f9d55; --mid:#e0a526; --low:#c9d3d2; --danger:#3a3f44;
+  --display:"Secular One","Rubik",system-ui,sans-serif; --body:"Rubik",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0c1a1b; --surface:#132729; --ink:#e3efee; --muted:#93acaa; --line:#25403f; --accent:#3cc1b9;
+  --good:#38c172; --mid:#e8b33a; --low:#2c4544; --danger:#0a0d0f; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0c1a1b; --surface:#132729; --ink:#e3efee; --muted:#93acaa; --line:#25403f; --accent:#3cc1b9;
+  --good:#38c172; --mid:#e8b33a; --low:#2c4544; --danger:#0a0d0f; color-scheme:dark;}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5}
+main{max-width:720px;margin:0 auto;padding:16px;display:grid;grid-template-columns:minmax(0,1fr);gap:18px}
+main>*{min-width:0}
+h1{font-family:var(--display);font-weight:400;font-size:1.7rem;margin:0;text-wrap:balance}
+h2{font-family:var(--display);font-weight:400;font-size:1.2rem;margin:0 0 8px}
+.sub{color:var(--muted);font-size:.85rem}
+.group{display:grid;gap:8px}
+.label{font-size:.8rem;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:6px 14px;font:inherit;font-size:.92rem;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--bg);font-weight:500}
+.chip:focus-visible,.cell:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px}
+.wins{display:grid;gap:8px}
+.win{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;border-bottom:1px solid var(--line);padding-bottom:8px}
+.win:last-child{border-bottom:0;padding-bottom:0}
+.pill{min-width:52px;text-align:center;border-radius:10px;padding:6px 8px;font-weight:700;font-variant-numeric:tabular-nums;color:#fff}
+.win .when{font-weight:500}
+.win .why{font-size:.82rem;color:var(--muted)}
+.gridwrap{overflow-x:auto}
+.week{display:grid;gap:4px;min-width:560px}
+.row{display:grid;grid-template-columns:64px repeat(24,1fr);gap:2px;align-items:center;direction:ltr}
+.row .day{direction:rtl;font-size:.8rem;text-align:right;padding-right:4px;white-space:nowrap}
+.cell{height:26px;border-radius:3px;border:0;padding:0;cursor:pointer;background:var(--low)}
+.cell.empty{background:transparent;cursor:default}
+.cell.unsafe{background:var(--danger);background-image:repeating-linear-gradient(45deg,transparent 0 3px,rgba(255,255,255,.18) 3px 5px)}
+.cell[aria-pressed="true"]{outline:2px solid var(--ink);outline-offset:1px}
+.hours{font-size:.68rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.hours span{text-align:center}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:.78rem;color:var(--muted);margin-top:8px}
+.legend i{display:inline-block;width:14px;height:10px;border-radius:2px;vertical-align:middle;margin-left:4px}
+.detail{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.stat .k{font-size:.78rem;color:var(--muted)}
+.stat .v{font-size:1.15rem;font-weight:500;font-variant-numeric:tabular-nums}
+.note{font-size:.8rem;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.cell{transition:transform .1s}.cell:hover{transform:scaleY(1.12)}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>מדד דיג – ניצנים, אשקלון, אשדוד, זיקים</h1>
+    <div class="sub" id="updated"></div>
+  </header>
+
+  <section class="group" aria-label="בחירה">
+    <div class="label">דג מטרה</div>
+    <div class="chips" id="speciesChips"></div>
+    <div class="label">חוף</div>
+    <div class="chips" id="beachChips"></div>
+  </section>
+
+  <section class="card">
+    <h2>החלונות הכי טובים השבוע</h2>
+    <div class="wins" id="wins"></div>
+  </section>
+
+  <section class="card">
+    <h2>כל השעות – לחץ על משבצת לפרטים</h2>
+    <div class="gridwrap"><div class="week" id="week"></div></div>
+    <div class="legend">
+      <span><i style="background:var(--good)"></i>טוב (70+)</span>
+      <span><i style="background:var(--mid)"></i>בינוני (45–70)</span>
+      <span><i style="background:var(--low)"></i>חלש</span>
+      <span><i style="background:var(--danger)"></i>לא בטוח</span>
+    </div>
+  </section>
+
+  <section class="card" aria-live="polite">
+    <h2 id="detailTitle">פרטי שעה</h2>
+    <div class="detail" id="detail"></div>
+  </section>
+
+  <p class="note">הנתונים מ־Open-Meteo, ציון 0–100 לכל שעה. המשקלים הם הנחות פתיחה ועוד לא כוילו מול תפיסות אמיתיות. התחזית לא מבדילה טוב בין חופים קרובים – את המקום בחרו לפי שוברי גלים, שפכי נחלים וציפורים.</p>
+</main>
+<script>
+const DATA = /*__DATA__*/null;
+const DAYS = ["ראשון","שני","שלישי","רביעי","חמישי","שישי","שבת"];
+let state = {species:"gumbar", beach:Object.keys(DATA.beaches)[0], idx:null};
+try{const s=JSON.parse(localStorage.getItem("fishIdx")||"{}"); if(DATA.species[s.species]) state.species=s.species; if(DATA.beaches[s.beach]) state.beach=s.beach;}catch(e){}
+
+function parseT(s){const [d,h]=s.split("T");const [y,m,dd]=d.split("-").map(Number);return {y,m,d:dd,h:Number(h),dow:new Date(y,m-1,dd).getDay(),key:d};}
+function color(v,unsafe){ if(unsafe) return "var(--danger)";
+  if(v>=70) return `color-mix(in oklab, var(--good) ${60+ (v-70)*1.3}%, var(--low))`;
+  if(v>=45) return `color-mix(in oklab, var(--mid) ${55+(v-45)*1.6}%, var(--low))`;
+  return `color-mix(in oklab, var(--mid) ${Math.max(0,v-10)*1.2}%, var(--low))`;}
+function pillBg(v){return v>=70?"var(--good)":v>=45?"var(--mid)":"var(--muted)";}
+function dayLabel(p){return `${DAYS[p.dow]} ${p.d}/${p.m}`;}
+function save(){try{localStorage.setItem("fishIdx",JSON.stringify({species:state.species,beach:state.beach}));}catch(e){}}
+
+function chips(el,obj,key){
+  el.innerHTML="";
+  for(const [k,v] of Object.entries(obj)){
+    const b=document.createElement("button");b.className="chip";b.type="button";b.id=`${key}-${k}`;
+    b.textContent=v.name;b.setAttribute("aria-pressed",state[key]===k);
+    b.onclick=()=>{state[key]=k;state.idx=null;save();render();};
+    el.appendChild(b);}
+}
+
+function render(){
+  document.getElementById("updated").textContent=`עודכן ${DATA.updated} · תחזית ל־7 ימים`;
+  chips(document.getElementById("speciesChips"),DATA.species,"species");
+  chips(document.getElementById("beachChips"),DATA.beaches,"beach");
+  const B=DATA.beaches[state.beach], S=B.series[state.species];
+
+  const wins=document.getElementById("wins"); wins.innerHTML="";
+  if(!S.wins.length){wins.textContent="אין חלונות בולטים השבוע.";}
+  S.wins.forEach(w=>{const a=parseT(w.s),e=parseT(w.e);
+    const r=document.createElement("div");r.className="win";
+    r.innerHTML=`<div class="pill" style="background:${pillBg(w.peak)}">${w.peak}</div>
+      <div><div class="when">יום ${dayLabel(a)}, ${String(a.h).padStart(2,"0")}:00–${String(e.h).padStart(2,"0")}:00</div>
+      <div class="why">ממוצע ${w.mean} · מה מגביל: ${w.lim}</div></div>`;
+    wins.appendChild(r);});
+
+  // week grid
+  const week=document.getElementById("week"); week.innerHTML="";
+  const hrs=document.createElement("div");hrs.className="row hours";
+  hrs.innerHTML="<span></span>"+Array.from({length:24},(_,h)=>`<span>${h%3===0?h:""}</span>`).join("");
+  week.appendChild(hrs);
+  const byDay=new Map();
+  B.t.forEach((t,i)=>{const p=parseT(t);if(!byDay.has(p.key))byDay.set(p.key,{p,cells:Array(24).fill(null)});byDay.get(p.key).cells[p.h]=i;});
+  if(state.idx===null){ // default: best hour
+    let best=0;S.score.forEach((v,i)=>{if(v>S.score[best])best=i;});state.idx=best;}
+  for(const {p,cells} of byDay.values()){
+    const row=document.createElement("div");row.className="row";
+    row.innerHTML=`<div class="day">${dayLabel(p)}</div>`;
+    cells.forEach((i,h)=>{const c=document.createElement("button");c.type="button";
+      if(i===null){c.className="cell empty";c.disabled=true;c.setAttribute("aria-hidden","true");}
+      else{c.className="cell"+(S.unsafe[i]?" unsafe":"");c.style.background=S.unsafe[i]?"":color(S.score[i],false);
+        c.id=`cell-${i}`;c.setAttribute("aria-label",`${dayLabel(p)} ${h}:00 ציון ${S.score[i]}`);
+        c.setAttribute("aria-pressed",state.idx===i);c.onclick=()=>{state.idx=i;render();};}
+      row.appendChild(c);});
+    week.appendChild(row);}
+  detail(B,S);
+}
+
+function detail(B,S){
+  const i=state.idx,p=parseT(B.t[i]);
+  document.getElementById("detailTitle").textContent=`יום ${dayLabel(p)}, ${String(p.h).padStart(2,"0")}:00`;
+  const onshore=B.onshore[i]>3?"מהים לחוף":B.onshore[i]<-3?"מהחוף לים":"לאורך החוף";
+  const stats=[["ציון",S.unsafe[i]?"לא בטוח":S.score[i]],["גובה גלים",`${B.wave[i]} מ'`],["טמפ' מים",`${B.sst[i]}°`],
+    ["רוח",`${B.wind[i]} קמ"ש`],["כיוון רוח",onshore],["מה מגביל",S.lim[i]]];
+  document.getElementById("detail").innerHTML=stats.map(([k,v])=>`<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+}
+render();
+</script>
+</body>
+</html>
