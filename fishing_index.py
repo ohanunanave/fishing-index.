@@ -158,7 +158,7 @@ MARINE_VARS = ["wave_height", "wave_period", "wave_direction", "sea_surface_temp
                "sea_level_height_msl", "ocean_current_velocity"]
 
 
-def _get_json(url: str, params: dict, tries: int = 6) -> dict:
+def _get_json(url: str, params: dict, tries: int = 5):
     """GET with retry/backoff – Open-Meteo returns 429 when shared CI IPs are busy."""
     import time
     import requests
@@ -202,6 +202,25 @@ def fetch_open_meteo(lat: float, lon: float, days: int, past_days: int = 3,
     df = dw.merge(dm, on="time", how="outer")
     df["time"] = pd.to_datetime(df["time"]).dt.tz_localize(TZ, ambiguous="NaT", nonexistent="shift_forward")
     return df.dropna(subset=["time"]).set_index("time").sort_index()
+
+
+def fetch_open_meteo_multi(points: list[tuple[float, float]], days: int, past_days: int = 3) -> list[pd.DataFrame]:
+    """One weather + one marine request for all locations (Open-Meteo accepts
+    comma-separated coordinates and returns a list) – avoids rate limits."""
+    lats = ",".join(str(p[0]) for p in points)
+    lons = ",".join(str(p[1]) for p in points)
+    common = dict(latitude=lats, longitude=lons, timezone=TZ, wind_speed_unit="kmh",
+                  forecast_days=days, past_days=past_days)
+    w = _get_json("https://api.open-meteo.com/v1/forecast", {**common, "hourly": ",".join(WEATHER_VARS)})
+    m = _get_json("https://marine-api.open-meteo.com/v1/marine", {**common, "hourly": ",".join(MARINE_VARS)})
+    w = w if isinstance(w, list) else [w]
+    m = m if isinstance(m, list) else [m]
+    out = []
+    for wi, mi in zip(w, m):
+        df = pd.DataFrame(wi["hourly"]).merge(pd.DataFrame(mi["hourly"]), on="time", how="outer")
+        df["time"] = pd.to_datetime(df["time"]).dt.tz_localize(TZ, ambiguous="NaT", nonexistent="shift_forward")
+        out.append(df.dropna(subset=["time"]).set_index("time").sort_index())
+    return out
 
 
 def demo_data(days: int, past_days: int = 3, seed: int = 7) -> pd.DataFrame:
@@ -387,15 +406,12 @@ def best_windows(res: pd.DataFrame, min_len=2, top=3) -> list[dict]:
 def run(beaches, species_keys, days, demo=False) -> pd.DataFrame:
     rows = []
     now = pd.Timestamp.now(tz=TZ).floor("h")
+    if not demo:
+        raws = dict(zip(beaches, fetch_open_meteo_multi(
+            [(BEACHES[k]["lat"], BEACHES[k]["lon"]) for k in beaches], days)))
     for bkey in beaches:
         b = BEACHES[bkey]
-        if demo:
-            raw = demo_data(days)
-        else:
-            if rows:
-                import time
-                time.sleep(3)  # be gentle with the free API
-            raw = fetch_open_meteo(b["lat"], b["lon"], days)
+        raw = demo_data(days) if demo else raws[bkey]
         feat = add_features(raw, b)
         feat = feat[feat.index >= now]
         for skey in species_keys:
