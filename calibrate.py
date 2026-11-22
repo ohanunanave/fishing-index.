@@ -48,7 +48,7 @@ def session_features(log: pd.DataFrame, demo=False) -> pd.DataFrame:
             raw = fi.fetch_open_meteo(b["lat"], b["lon"], days=0, start_date=d0, end_date=d1)
         feat = fi.add_features(raw, b)
         for i, r in g.iterrows():
-            sub = fi.score_species(feat.loc[r["t0"]:r["t1"]], fi.SPECIES[r["species"]])
+            sub = fi.score_species(feat.loc[r["t0"]:r["t1"]], fi.SPECIES[r["species"]], beach_key=bkey)
             if sub.empty:
                 continue
             x = {f"log_{k}": np.log(np.clip(sub[f"s_{k}"].astype(float), 1e-3, 1)).mean() for k in FACTORS}

@@ -41,10 +41,16 @@ TZ = "Asia/Jerusalem"
 # Coordinates are approximate – adjust to your exact spot.
 # ----------------------------------------------------------------------------
 BEACHES = {
-    "nitzanim": dict(name="ניצנים", lat=31.727, lon=34.585, coast_normal_deg=292, structure="sand"),
-    "ashkelon_delila": dict(name="אשקלון – דלילה", lat=31.683, lon=34.548, coast_normal_deg=295, structure="breakwaters"),
-    "ashdod_lido": dict(name="אשדוד – לידו/מרינה", lat=31.802, lon=34.628, coast_normal_deg=290, structure="breakwaters"),
-    "zikim": dict(name="זיקים", lat=31.612, lon=34.505, coast_normal_deg=300, structure="sand"),
+    # habitat features 0..1 (rough, editable): rocks = breakwaters / kurkar reefs,
+    # lights = marina / promenade lighting at night, stream = river/stream mouth nearby
+    "nitzanim": dict(name="ניצנים", lat=31.727, lon=34.585, coast_normal_deg=292,
+                     habitat=dict(rocks=0.4, lights=0.0, stream=0.0)),
+    "ashkelon_delila": dict(name="אשקלון – דלילה", lat=31.683, lon=34.548, coast_normal_deg=295,
+                            habitat=dict(rocks=1.0, lights=0.7, stream=0.0)),
+    "ashdod_lido": dict(name="אשדוד – לידו/מרינה", lat=31.802, lon=34.628, coast_normal_deg=290,
+                        habitat=dict(rocks=1.0, lights=0.8, stream=0.2)),
+    "zikim": dict(name="זיקים", lat=31.612, lon=34.505, coast_normal_deg=300,
+                  habitat=dict(rocks=0.2, lights=0.0, stream=0.4)),
 }
 
 # ----------------------------------------------------------------------------
@@ -66,6 +72,8 @@ class Species:
     waves: tuple
     murk_pref: float
     notes: str = ""
+    habitat: dict = field(default_factory=dict)  # feature -> importance 0..1
+    legal: str = ""                               # rules shown to the user
 
 
 SPECIES = {
@@ -82,7 +90,8 @@ SPECIES = {
         sst=(16, 20, 27, 29),  # FishBase preferred range 16.2-29 °C
         light=dict(night=0.5, twilight=1.0, day=0.5),
         waves=(0.2, 0.5, 1.2, 1.7), murk_pref=0.6,
-        notes="close to shore, murky surf and river/stream mouths, follows mullet"),
+        notes="close to shore, murky surf and river/stream mouths, follows mullet",
+        habitat=dict(stream=0.4)),
     "levrak": Species(
         "levrak", "לברק (European seabass)",
         months=[1.0, 1.0, 0.8, 0.5, 0.3, 0.2, 0.2, 0.2, 0.3, 0.6, 0.9, 1.0],
@@ -97,6 +106,37 @@ SPECIES = {
         light=dict(night=0.1, twilight=1.0, day=0.6),
         waves=(0.0, 0.2, 0.7, 1.2), murk_pref=-1.0,
         notes="pelagic, clear water, calm-ish sea, long casts with metal jigs"),
+    "trachon": Species(
+        "trachon", "טרכון (Horse mackerel, Trachurus)",
+        months=[0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.7, 0.8, 0.9, 1.0, 1.0, 0.8],
+        sst=(14, 17, 26, 29),
+        light=dict(night=1.0, twilight=0.9, day=0.35),
+        waves=(0.0, 0.1, 0.6, 1.1), murk_pref=-0.4,
+        notes="schooling plankton/small-fish feeder; gathers under lights at night; "
+              "light gear, small jigs / sabiki; calm water",
+        habitat=dict(lights=0.7, rocks=0.3),
+        legal="גודל מינימלי 11 ס\"מ"),
+    "lokus": Species(
+        "lokus", "לוקוס (Dusky grouper)",
+        months=[0.3, 0.3, 0.4, 0.5, 0.7, 0.9, 1.0, 1.0, 0.9, 0.7, 0.5, 0.4],
+        sst=(16, 19, 27, 30),
+        light=dict(night=0.45, twilight=1.0, day=0.7),
+        waves=(0.0, 0.15, 0.8, 1.3), murk_pref=-0.3,
+        notes="ambush predator of rocks/breakwaters; mostly inactive, more active when warm and "
+              "around spawning (summer); work jigs/soft plastics close to the rocks",
+        habitat=dict(rocks=0.9),
+        legal="גודל מינימלי 40 ס\"מ. דקר אלכסנדרוני (לוקוס חופש) מוגן ואסור לדוג. "
+              "יש איסור עונתי נפרד לדקרים – בדוק במודעת רשות הטבע והגנים"),
+    "dennis": Species(
+        "dennis", "דניס (Gilthead seabream)",
+        months=[0.8, 0.7, 0.7, 0.7, 0.6, 0.5, 0.5, 0.5, 0.6, 0.8, 0.9, 0.9],
+        sst=(13, 16, 25, 28),
+        light=dict(night=0.4, twilight=1.0, day=0.8),
+        waves=(0.1, 0.3, 0.9, 1.4), murk_pref=0.2,
+        notes="feeds on shellfish/crabs near rocks and mussel-covered structure; mostly a bait fish – "
+              "on lures use small crab/soft-plastic imitations slowly near the bottom",
+        habitat=dict(rocks=0.6),
+        legal="גודל מינימלי 15 ס\"מ"),
 }
 
 # Global factor weights (exponents in the geometric mean). Evidence-based ranking:
@@ -112,6 +152,7 @@ WEIGHTS = dict(
     wind=0.5,
     current=0.2,
     moon_night=0.15,
+    habitat=1.0,
 )
 
 SAFETY = dict(max_wave_m=2.0, max_wind_kmh=40.0, max_gust_kmh=60.0)
@@ -340,9 +381,21 @@ def moon_night_score(df):
     return np.where(night, 0.8 + 0.2 * m, 1.0)
 
 
-def score_species(df: pd.DataFrame, sp: Species, weights=WEIGHTS) -> pd.DataFrame:
+def habitat_score(sp: Species, beach_key: str | None) -> float:
+    """How well the beach's features match what the fish needs (rocks, lights, stream)."""
+    if not beach_key or not sp.habitat:
+        return 1.0
+    feat = BEACHES[beach_key].get("habitat", {})
+    s = 1.0
+    for k, imp in sp.habitat.items():
+        s *= 1 - imp * (1 - feat.get(k, 0.0))
+    return float(np.clip(s, 0.1, 1.0))
+
+
+def score_species(df: pd.DataFrame, sp: Species, weights=WEIGHTS, beach_key: str | None = None) -> pd.DataFrame:
     month = df.index.month.values
     sub = pd.DataFrame(index=df.index)
+    sub["habitat"] = habitat_score(sp, beach_key)
     sub["season"] = np.array(sp.months)[month - 1]
     sub["sst"] = trapezoid(df["sea_surface_temperature"], *sp.sst, floor=0.1)
     sub["light"] = light_score(df["sun_elev"], sp)
@@ -376,7 +429,7 @@ def score_species(df: pd.DataFrame, sp: Species, weights=WEIGHTS) -> pd.DataFram
 # ----------------------------------------------------------------------------
 FACTOR_HE = dict(season="עונה", sst="טמפ' מים", light="אור/שעה", waves="גלים",
                  water_clarity="צלילות", post_storm="אחרי סערה", pressure_trend="לחץ",
-                 wind="רוח", current="זרם", moon_night="ירח")
+                 wind="רוח", current="זרם", moon_night="ירח", habitat="מבנה החוף")
 
 
 def best_windows(res: pd.DataFrame, min_len=2, top=3) -> list[dict]:
@@ -415,7 +468,7 @@ def run(beaches, species_keys, days, demo=False) -> pd.DataFrame:
         feat = add_features(raw, b)
         feat = feat[feat.index >= now]
         for skey in species_keys:
-            res = score_species(feat, SPECIES[skey])
+            res = score_species(feat, SPECIES[skey], beach_key=bkey)
             res.insert(0, "species", skey)
             res.insert(0, "beach", bkey)
             res = res.join(feat[["wave_height", "sea_surface_temperature", "wind_speed_10m",

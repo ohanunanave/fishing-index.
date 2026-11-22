@@ -27,7 +27,7 @@ for bkey, g in d.groupby("beach", sort=False):
         series={},
     )
 for (bkey, skey), g in d.groupby(["beach", "species"], sort=False):
-    wins = fi.best_windows(g)
+    wins = fi.best_windows(g, top=5)
     beaches[bkey]["series"][skey] = dict(
         score=g["score"].round(0).astype(int).tolist(),
         lim=[fi.FACTOR_HE.get(x, x) for x in g["limiting"]],
@@ -37,7 +37,7 @@ for (bkey, skey), g in d.groupby(["beach", "species"], sort=False):
                    lim=fi.FACTOR_HE.get(w["limiting"], w["limiting"])) for w in wins],
     )
 for skey, sp in fi.SPECIES.items():
-    species[skey] = dict(name=sp.name.split(" (")[0])
+    species[skey] = dict(name=sp.name.split(" (")[0], legal=sp.legal)
 
 data = dict(updated=pd.Timestamp.now(tz=fi.TZ).strftime("%d/%m/%Y %H:%M"),
             beaches=beaches, species=species)

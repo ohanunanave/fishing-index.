@@ -42,7 +42,7 @@ h2{font-family:var(--display);font-weight:400;font-size:1.2rem;margin:0 0 8px}
 .pill{min-width:52px;text-align:center;border-radius:10px;padding:6px 8px;font-weight:700;font-variant-numeric:tabular-nums;color:#fff}
 .win .when{font-weight:500}
 .win .why{font-size:.82rem;color:var(--muted)}
-.gridwrap{overflow-x:auto}
+.gridwrap{overflow-x:auto;direction:ltr}
 .week{display:grid;gap:4px;min-width:560px}
 .row{display:grid;grid-template-columns:64px repeat(24,1fr);gap:2px;align-items:center;direction:ltr}
 .row .day{direction:rtl;font-size:.8rem;text-align:right;padding-right:4px;white-space:nowrap}
@@ -59,6 +59,21 @@ h2{font-family:var(--display);font-weight:400;font-size:1.2rem;margin:0 0 8px}
 .stat .v{font-size:1.15rem;font-weight:500;font-variant-numeric:tabular-nums}
 .note{font-size:.8rem;color:var(--muted)}
 @media (prefers-reduced-motion:no-preference){.cell{transition:transform .1s}.cell:hover{transform:scaleY(1.12)}}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px;gap:4px}
+.segbtn{border:0;background:transparent;color:var(--ink);font:inherit;font-weight:500;padding:9px;border-radius:9px;cursor:pointer}
+.segbtn[aria-pressed="true"]{background:var(--accent);color:var(--bg)}
+.segbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.fishname{font-size:.8rem;font-weight:700;color:var(--accent)}
+.legal{font-size:.8rem;color:var(--muted);margin-top:10px}
+.legal:empty{display:none}
+.fishlist{display:grid;gap:8px;margin-top:12px}
+.fishlist:empty{display:none}
+.frow{display:grid;grid-template-columns:5.5rem 1fr 3.2rem;gap:4px 10px;align-items:center}
+.fname{font-weight:500}
+.bar{height:10px;background:var(--low);border-radius:5px;overflow:hidden;direction:rtl}
+.bar span{display:block;height:100%;border-radius:5px}
+.fval{font-variant-numeric:tabular-nums;font-weight:700;text-align:left}
+.flim{grid-column:1/-1;font-size:.75rem;color:var(--muted);margin-top:-4px}
 </style>
 </head>
 <body>
@@ -69,19 +84,24 @@ h2{font-family:var(--display);font-weight:400;font-size:1.2rem;margin:0 0 8px}
   </header>
 
   <section class="group" aria-label="בחירה">
-    <div class="label">דג מטרה</div>
-    <div class="chips" id="speciesChips"></div>
-    <div class="label">חוף</div>
-    <div class="chips" id="beachChips"></div>
+    <div class="seg" role="group" aria-label="תצוגה">
+      <button type="button" id="mode-fish" class="segbtn">לפי דג</button>
+      <button type="button" id="mode-beach" class="segbtn">לפי חוף</button>
+    </div>
+    <div class="label" id="l1"></div>
+    <div class="chips" id="chips1"></div>
+    <div class="label" id="l2"></div>
+    <div class="chips" id="chips2"></div>
   </section>
 
   <section class="card">
-    <h2>החלונות הכי טובים השבוע</h2>
+    <h2 id="winsTitle">החלונות הכי טובים השבוע</h2>
     <div class="wins" id="wins"></div>
+    <div class="legal" id="legal"></div>
   </section>
 
   <section class="card">
-    <h2>כל השעות – לחץ על משבצת לפרטים</h2>
+    <h2 id="gridTitle">כל השעות – לחץ על משבצת לפרטים</h2>
     <div class="gridwrap"><div class="week" id="week"></div></div>
     <div class="legend">
       <span><i style="background:var(--good)"></i>טוב (70+)</span>
@@ -94,79 +114,124 @@ h2{font-family:var(--display);font-weight:400;font-size:1.2rem;margin:0 0 8px}
   <section class="card" aria-live="polite">
     <h2 id="detailTitle">פרטי שעה</h2>
     <div class="detail" id="detail"></div>
+    <div class="fishlist" id="fishlist"></div>
   </section>
 
-  <p class="note">הנתונים מ־Open-Meteo, ציון 0–100 לכל שעה. המשקלים הם הנחות פתיחה ועוד לא כוילו מול תפיסות אמיתיות. התחזית לא מבדילה טוב בין חופים קרובים – את המקום בחרו לפי שוברי גלים, שפכי נחלים וציפורים.</p>
+  <p class="note">הנתונים מ־Open-Meteo, מתעדכנים כל 3 שעות. הציון (0–100) הוא סיכוי יחסי ולא הסתברות: הוא משווה שעות וחופים, והמשקלים עדיין לא כוילו מול תפיסות אמיתיות. מגבלה כללית לדיג ספורטיבי: עד 5 ק"ג או שני דגים גדולים ביום.</p>
 </main>
 <script>
 const DATA = /*__DATA__*/null;
 const DAYS = ["ראשון","שני","שלישי","רביעי","חמישי","שישי","שבת"];
-let state = {species:"gumbar", beach:Object.keys(DATA.beaches)[0], idx:null};
-try{const s=JSON.parse(localStorage.getItem("fishIdx")||"{}"); if(DATA.species[s.species]) state.species=s.species; if(DATA.beaches[s.beach]) state.beach=s.beach;}catch(e){}
+const SP = Object.keys(DATA.species), BE = Object.keys(DATA.beaches);
+let state = {mode:"fish", species:"gumbar", beach:BE[0], filter:"all", idx:null};
+try{const s=JSON.parse(localStorage.getItem("fishIdx2")||"{}");
+  if(s.mode==="beach"||s.mode==="fish") state.mode=s.mode;
+  if(DATA.species[s.species]) state.species=s.species;
+  if(DATA.beaches[s.beach]) state.beach=s.beach;
+  if(s.filter==="all"||DATA.species[s.filter]) state.filter=s.filter;}catch(e){}
+function save(){try{localStorage.setItem("fishIdx2",JSON.stringify({mode:state.mode,species:state.species,beach:state.beach,filter:state.filter}));}catch(e){}}
 
 function parseT(s){const [d,h]=s.split("T");const [y,m,dd]=d.split("-").map(Number);return {y,m,d:dd,h:Number(h),dow:new Date(y,m-1,dd).getDay(),key:d};}
-function color(v,unsafe){ if(unsafe) return "var(--danger)";
-  if(v>=70) return `color-mix(in oklab, var(--good) ${60+ (v-70)*1.3}%, var(--low))`;
+function color(v){
+  if(v>=70) return `color-mix(in oklab, var(--good) ${Math.min(100,60+(v-70)*1.3)}%, var(--low))`;
   if(v>=45) return `color-mix(in oklab, var(--mid) ${55+(v-45)*1.6}%, var(--low))`;
   return `color-mix(in oklab, var(--mid) ${Math.max(0,v-10)*1.2}%, var(--low))`;}
 function pillBg(v){return v>=70?"var(--good)":v>=45?"var(--mid)":"var(--muted)";}
+function tier(v){return v>=70?"סיכוי גבוה":v>=45?"סיכוי בינוני":"סיכוי נמוך";}
 function dayLabel(p){return `${DAYS[p.dow]} ${p.d}/${p.m}`;}
-function save(){try{localStorage.setItem("fishIdx",JSON.stringify({species:state.species,beach:state.beach}));}catch(e){}}
+function hh(h){return String(h).padStart(2,"0")+":00";}
+const $=id=>document.getElementById(id);
 
-function chips(el,obj,key){
+function chipRow(el,items,cur,onPick){
   el.innerHTML="";
-  for(const [k,v] of Object.entries(obj)){
-    const b=document.createElement("button");b.className="chip";b.type="button";b.id=`${key}-${k}`;
-    b.textContent=v.name;b.setAttribute("aria-pressed",state[key]===k);
-    b.onclick=()=>{state[key]=k;state.idx=null;save();render();};
-    el.appendChild(b);}
+  items.forEach(([k,label])=>{const b=document.createElement("button");b.type="button";b.className="chip";
+    b.id=`chip-${el.id}-${k}`;b.textContent=label;b.setAttribute("aria-pressed",cur===k);
+    b.onclick=()=>{onPick(k);state.idx=null;save();render();};el.appendChild(b);});
+}
+
+// which species are "active" for scoring in the current view
+function activeSpecies(){
+  if(state.mode==="fish") return [state.species];
+  return state.filter==="all"? SP : [state.filter];
+}
+// per-hour best score across active species at current beach
+function hourly(B){
+  const act=activeSpecies();
+  return B.t.map((_,i)=>{let best=null;
+    act.forEach(k=>{const S=B.series[k];if(!S)return;const v=S.unsafe[i]?-1:S.score[i];
+      if(best===null||v>best.v)best={k,v,unsafe:S.unsafe[i]};});return best;});
 }
 
 function render(){
-  document.getElementById("updated").textContent=`עודכן ${DATA.updated} · תחזית ל־7 ימים`;
-  chips(document.getElementById("speciesChips"),DATA.species,"species");
-  chips(document.getElementById("beachChips"),DATA.beaches,"beach");
-  const B=DATA.beaches[state.beach], S=B.series[state.species];
+  $("updated").textContent=`עודכן ${DATA.updated} · תחזית ל־7 ימים`;
+  $("mode-fish").setAttribute("aria-pressed",state.mode==="fish");
+  $("mode-beach").setAttribute("aria-pressed",state.mode==="beach");
+  const spItems=SP.map(k=>[k,DATA.species[k].name]), beItems=BE.map(k=>[k,DATA.beaches[k].name]);
+  if(state.mode==="fish"){
+    $("l1").textContent="דג מטרה"; chipRow($("chips1"),spItems,state.species,k=>state.species=k);
+    $("l2").textContent="חוף"; chipRow($("chips2"),beItems,state.beach,k=>state.beach=k);
+  }else{
+    $("l1").textContent="חוף"; chipRow($("chips1"),beItems,state.beach,k=>state.beach=k);
+    $("l2").textContent="איזה דג"; chipRow($("chips2"),[["all","כל הדגים"],...spItems],state.filter,k=>state.filter=k);
+  }
+  const B=DATA.beaches[state.beach], act=activeSpecies(), multi=act.length>1;
 
-  const wins=document.getElementById("wins"); wins.innerHTML="";
-  if(!S.wins.length){wins.textContent="אין חלונות בולטים השבוע.";}
-  S.wins.forEach(w=>{const a=parseT(w.s),e=parseT(w.e);
-    const r=document.createElement("div");r.className="win";
+  // best windows (merged across active species)
+  // with several fish, keep at most 2 windows per fish so the list shows variety
+  let wins=[];act.forEach(k=>(B.series[k]?.wins||[]).slice(0,multi?2:5).forEach(w=>wins.push({...w,k})));
+  wins.sort((a,b)=>b.peak-a.peak||b.mean-a.mean); wins=wins.slice(0,multi?8:5);
+  $("winsTitle").textContent= state.mode==="beach"
+    ? `הזמנים הכי טובים ב${B.name}` + (multi?"":` – ${DATA.species[act[0]].name}`)
+    : `החלונות הכי טובים ל${DATA.species[state.species].name} ב${B.name}`;
+  const W=$("wins");W.innerHTML="";
+  if(!wins.length) W.textContent="אין חלונות בולטים השבוע.";
+  wins.forEach(w=>{const a=parseT(w.s),e=parseT(w.e);const r=document.createElement("div");r.className="win";
     r.innerHTML=`<div class="pill" style="background:${pillBg(w.peak)}">${w.peak}</div>
-      <div><div class="when">יום ${dayLabel(a)}, ${String(a.h).padStart(2,"0")}:00–${String(e.h).padStart(2,"0")}:00</div>
-      <div class="why">ממוצע ${w.mean} · מה מגביל: ${w.lim}</div></div>`;
-    wins.appendChild(r);});
+     <div>${multi?`<div class="fishname">${DATA.species[w.k].name}</div>`:""}
+     <div class="when">יום ${dayLabel(a)}, ${hh(a.h)}–${hh(e.h)}</div>
+     <div class="why">${tier(w.peak)} · ממוצע ${w.mean} · מה מגביל: ${w.lim}</div></div>`;
+    W.appendChild(r);});
+  $("legal").textContent = multi ? "" : (DATA.species[act[0]].legal ? "⚖ "+DATA.species[act[0]].legal : "");
 
-  // week grid
-  const week=document.getElementById("week"); week.innerHTML="";
+  // grid
+  $("gridTitle").textContent = multi ? "כל השעות – הדג הכי מבטיח בכל שעה" : "כל השעות – לחץ על משבצת לפרטים";
+  const H=hourly(B), week=$("week"); week.innerHTML="";
   const hrs=document.createElement("div");hrs.className="row hours";
-  hrs.innerHTML="<span></span>"+Array.from({length:24},(_,h)=>`<span>${h%3===0?h:""}</span>`).join("");
-  week.appendChild(hrs);
+  hrs.innerHTML="<span></span>"+Array.from({length:24},(_,h)=>`<span>${h%3===0?h:""}</span>`).join("");week.appendChild(hrs);
+  if(state.idx===null){let bi=0;H.forEach((x,i)=>{if(x&&x.v>H[bi].v)bi=i;});state.idx=bi;}
   const byDay=new Map();
   B.t.forEach((t,i)=>{const p=parseT(t);if(!byDay.has(p.key))byDay.set(p.key,{p,cells:Array(24).fill(null)});byDay.get(p.key).cells[p.h]=i;});
-  if(state.idx===null){ // default: best hour
-    let best=0;S.score.forEach((v,i)=>{if(v>S.score[best])best=i;});state.idx=best;}
   for(const {p,cells} of byDay.values()){
-    const row=document.createElement("div");row.className="row";
-    row.innerHTML=`<div class="day">${dayLabel(p)}</div>`;
+    const row=document.createElement("div");row.className="row";row.innerHTML=`<div class="day">${dayLabel(p)}</div>`;
     cells.forEach((i,h)=>{const c=document.createElement("button");c.type="button";
       if(i===null){c.className="cell empty";c.disabled=true;c.setAttribute("aria-hidden","true");}
-      else{c.className="cell"+(S.unsafe[i]?" unsafe":"");c.style.background=S.unsafe[i]?"":color(S.score[i],false);
-        c.id=`cell-${i}`;c.setAttribute("aria-label",`${dayLabel(p)} ${h}:00 ציון ${S.score[i]}`);
+      else{const x=H[i];const unsafe=x.v<0;c.className="cell"+(unsafe?" unsafe":"");if(!unsafe)c.style.background=color(x.v);
+        c.id=`cell-${i}`;c.setAttribute("aria-label",`${dayLabel(p)} ${h}:00 ציון ${unsafe?"לא בטוח":x.v}`);
         c.setAttribute("aria-pressed",state.idx===i);c.onclick=()=>{state.idx=i;render();};}
       row.appendChild(c);});
     week.appendChild(row);}
-  detail(B,S);
+  detail(B,act,H);
 }
 
-function detail(B,S){
-  const i=state.idx,p=parseT(B.t[i]);
-  document.getElementById("detailTitle").textContent=`יום ${dayLabel(p)}, ${String(p.h).padStart(2,"0")}:00`;
+function detail(B,act,H){
+  const i=state.idx,p=parseT(B.t[i]),x=H[i];
+  $("detailTitle").textContent=`${B.name} · יום ${dayLabel(p)}, ${hh(p.h)}`;
   const onshore=B.onshore[i]>3?"מהים לחוף":B.onshore[i]<-3?"מהחוף לים":"לאורך החוף";
-  const stats=[["ציון",S.unsafe[i]?"לא בטוח":S.score[i]],["גובה גלים",`${B.wave[i]} מ'`],["טמפ' מים",`${B.sst[i]}°`],
-    ["רוח",`${B.wind[i]} קמ"ש`],["כיוון רוח",onshore],["מה מגביל",S.lim[i]]];
-  document.getElementById("detail").innerHTML=stats.map(([k,v])=>`<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+  const stats=[["גובה גלים",`${B.wave[i]} מ'`],["טמפ' מים",`${B.sst[i]}°`],["רוח",`${B.wind[i]} קמ"ש`],["כיוון רוח",onshore]];
+  if(act.length===1){const S=B.series[act[0]];stats.unshift(["ציון",S.unsafe[i]?"לא בטוח":S.score[i]]);stats.push(["מה מגביל",S.lim[i]]);}
+  $("detail").innerHTML=stats.map(([k,v])=>`<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+  const FL=$("fishlist");
+  if(act.length>1){
+    const rows=act.map(k=>({k,S:B.series[k]})).filter(o=>o.S).map(o=>({k:o.k,v:o.S.score[i],u:o.S.unsafe[i],lim:o.S.lim[i]}))
+      .sort((a,b)=>b.v-a.v);
+    FL.innerHTML=`<div class="label">הסיכוי לכל דג בשעה הזו</div>`+rows.map(r=>`<div class="frow">
+      <span class="fname">${DATA.species[r.k].name}</span>
+      <span class="bar"><span style="width:${r.u?0:r.v}%;background:${pillBg(r.v)}"></span></span>
+      <span class="fval">${r.u?"לא בטוח":r.v}</span><span class="flim">מגביל: ${r.lim}</span></div>`).join("");
+  }else FL.innerHTML="";
 }
+$("mode-fish").onclick=()=>{state.mode="fish";state.idx=null;save();render();};
+$("mode-beach").onclick=()=>{state.mode="beach";state.idx=null;save();render();};
 render();
 </script>
 </body>
