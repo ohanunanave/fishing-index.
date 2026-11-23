@@ -129,6 +129,18 @@ SPECIES = {
         habitat=dict(rocks=0.9),
         legal="גודל מינימלי 40 ס\"מ. דקר אלכסנדרוני (לוקוס חופש) מוגן ואסור לדוג. "
               "יש איסור עונתי נפרד לדקרים – בדוק במודעת רשות הטבע והגנים"),
+    "sargos": Species(
+        "sargos", "סרגוס (White seabream, Diplodus sargus)",
+        # resident & territorial (small home range); spawning winter–early summer
+        months=[0.9, 0.9, 0.9, 0.85, 0.8, 0.75, 0.75, 0.75, 0.8, 0.85, 0.9, 0.9],
+        sst=(13, 16, 26, 29),
+        # natural reefs: mostly diurnal; artificial reefs (breakwaters): mostly nocturnal
+        light=dict(night=0.7, twilight=1.0, day=0.75),
+        waves=(0.15, 0.35, 1.1, 1.6), murk_pref=0.3,
+        notes="omnivore of benthic invertebrates on rocks/mixed bottom, hides in crevices; mostly bait – "
+              "on lures: small soft plastics / small jigs worked slowly close to the rocks",
+        habitat=dict(rocks=0.8),
+        legal=""),
     "dennis": Species(
         "dennis", "דניס (Gilthead seabream)",
         months=[0.8, 0.7, 0.7, 0.7, 0.6, 0.5, 0.5, 0.5, 0.6, 0.8, 0.9, 0.9],
