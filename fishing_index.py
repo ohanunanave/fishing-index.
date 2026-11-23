@@ -108,14 +108,15 @@ SPECIES = {
         notes="pelagic, clear water, calm-ish sea, long casts with metal jigs"),
     "trachon": Species(
         "trachon", "טרחון (Blue runner, Caranx crysos)",
-        # thermophilic; in the Med strongly associated with floating structure Sep–Jan
-        months=[0.6, 0.35, 0.25, 0.25, 0.35, 0.5, 0.7, 0.8, 0.95, 1.0, 1.0, 0.85],
-        sst=(17, 21, 28, 30),  # FishBase preferred 16.9-27.9, mean 24.9 °C
-        light=dict(night=0.25, twilight=1.0, day=0.85),
+        # Sources disagree on season: Med FAD studies -> Sep–Jan; local angler guide (Baba Jig)
+        # -> late winter + spring. Keep a flat-high prior with both peaks and let SST decide.
+        months=[0.75, 0.85, 0.95, 0.95, 0.8, 0.6, 0.6, 0.7, 0.85, 0.95, 0.95, 0.85],
+        sst=(15, 18, 27, 30),  # FishBase preferred 16.9-27.9, mean 24.9 °C
+        light=dict(night=0.25, twilight=1.0, day=0.9),
         waves=(0.0, 0.2, 0.9, 1.4), murk_pref=-0.3,
-        notes="diurnal schooling jack over sand; opportunistic (zooplankton, invertebrates, small fish); "
-              "fast-retrieved small metal jigs/spoons; follows floating objects and bait schools",
-        habitat=dict(rocks=0.15),
+        notes="diurnal schooling jack; near shore, breakwaters, holes and currents; fast shiny lures – "
+              "metal jigs, small poppers, short minnows; medium steady retrieve with sudden jerks",
+        habitat=dict(rocks=0.4),
         legal=""),
     "lokus": Species(
         "lokus", "לוקוס (Dusky grouper)",
