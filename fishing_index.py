@@ -107,15 +107,16 @@ SPECIES = {
         waves=(0.0, 0.2, 0.7, 1.2), murk_pref=-1.0,
         notes="pelagic, clear water, calm-ish sea, long casts with metal jigs"),
     "trachon": Species(
-        "trachon", "טרכון (Horse mackerel, Trachurus)",
-        months=[0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.7, 0.8, 0.9, 1.0, 1.0, 0.8],
-        sst=(14, 17, 26, 29),
-        light=dict(night=1.0, twilight=0.9, day=0.35),
-        waves=(0.0, 0.1, 0.6, 1.1), murk_pref=-0.4,
-        notes="schooling plankton/small-fish feeder; gathers under lights at night; "
-              "light gear, small jigs / sabiki; calm water",
-        habitat=dict(lights=0.7, rocks=0.3),
-        legal="גודל מינימלי 11 ס\"מ"),
+        "trachon", "טרחון (Blue runner, Caranx crysos)",
+        # thermophilic; in the Med strongly associated with floating structure Sep–Jan
+        months=[0.6, 0.35, 0.25, 0.25, 0.35, 0.5, 0.7, 0.8, 0.95, 1.0, 1.0, 0.85],
+        sst=(17, 21, 28, 30),  # FishBase preferred 16.9-27.9, mean 24.9 °C
+        light=dict(night=0.25, twilight=1.0, day=0.85),
+        waves=(0.0, 0.2, 0.9, 1.4), murk_pref=-0.3,
+        notes="diurnal schooling jack over sand; opportunistic (zooplankton, invertebrates, small fish); "
+              "fast-retrieved small metal jigs/spoons; follows floating objects and bait schools",
+        habitat=dict(rocks=0.15),
+        legal=""),
     "lokus": Species(
         "lokus", "לוקוס (Dusky grouper)",
         months=[0.3, 0.3, 0.4, 0.5, 0.7, 0.9, 1.0, 1.0, 0.9, 0.7, 0.5, 0.4],
